@@ -9,6 +9,16 @@ from .minilockfile import *
 from nacl.utils import random
 from base58 import b58encode
 
+def get_id_private(options):
+    if options.private:
+        return id_private_from_key(options.private)
+    email = options.email
+    while email is None:
+        email = raw_input('E-mail: ')
+    password = getpass('Passphrase: ')
+    return IDPrivateKey(password, email)
+
+
 def main():
     parser = OptionParser()
     parser.add_option('-g', '--gen-id',
@@ -16,31 +26,37 @@ def main():
                       action='store_true',
                       default=False,
                       help='Generate a miniLockid and then quit.')
-    parser.add_option('-i', '--mlid',
-                      dest='mlid',
+    parser.add_option('--reveal-private-key',
+                      dest='revealpk',
+                      default=False,
+                      action='store_true',
+                      help='When used with -g, reveals private key '
+                           '(dangerous!)')
+    parser.add_option('-e', '--email',
+                      dest='email',
                       default=None,
                       action='store',
                       type='str',
-                      help='Specify the miniLockid of the current user.')
+                      help='Specify e-mail. (usually required.)')
+    parser.add_option('-p', '--private-key',
+                      dest='private',
+                      default=None,
+                      action='store',
+                      type='str',
+                      help='Specify private key.')
     parser.add_option('-d', '--dest',
                       dest='dests',
                       action='append',
                       type='str',
                       help='Specify destination minilockids. Can be '
                            'used more than once.')
-    parser.add_option('-s', '--short',
-                      dest='salt',
-                      action='store_false',
-                      default=True,
-                      help='Generate miniLockid from password only. '
-                           '(Insecure!)')
-    parser.add_option('-e', '--encrypt',
+    parser.add_option('-i', '--encrypt',
                       dest='encrypt',
                       action='store',
                       type='str',
                       default=None,
                       help='Encrypt file.')
-    parser.add_option('-x', '--decrypt',
+    parser.add_option('-o', '--decrypt',
                       dest='decrypt',
                       action='store',
                       type='str',
@@ -49,16 +65,11 @@ def main():
     (options, args) = parser.parse_args()
 
     if options.genid:
-        password = getpass('Passphrase: ')
-        b58 = IDPrivateKey(password, randomsalt=options.salt).\
-              pub_base58()
-        print("miniLockid: {}".format(b58))
-    elif options.mlid is None and options.salt:
-        print('You must set the short miniLock ID option or '
-              'specify your full ID.')
+        pk = get_id_private(options)
+        print("miniLockid: {}".format(pk.pub_base58()))
+        if options.revealpk:
+            print("Private Key: {}".format(pk.pri_base58()))
     elif options.encrypt:
-        password = getpass('Passphrase: ')
-        pk = IDPrivateKey(password, options.mlid, randomsalt=False)
         if options.dests is None:
             print('WARNING: No destination IDs specified. Encrypting to '
                   'self.')
@@ -68,18 +79,18 @@ def main():
         with open(options.encrypt, 'rb') as f:
             d = f.read()
         fname = b58encode(random(8)) + '.minilock'
+        pk = get_id_private(options)
         with open(fname, 'wb') as f:
             f.write(encrypt_file(d, basename(options.encrypt), pk, pids))
         print("Encrypted {} to {}.".format(basename(options.encrypt),
                                            fname))
     elif options.decrypt:
-        password = getpass('Passphrase: ')
-        pk = IDPrivateKey(password, options.mlid, randomsalt=False)
         with open(options.decrypt, 'rb') as f:
             d = f.read()
         if d[:16] != 'miniLockFileYes.':
             print "Not a miniLock file."
             return
+        pk = get_id_private(options)
         try:
             sender, fname, d = decrypt_file(d, pk)
         except DecryptionError:

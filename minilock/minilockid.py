@@ -13,24 +13,25 @@ from nacl.utils import random
 
 defaultsalt = 'miniLockScrypt..'
 
+def id_private_from_key(key):
+    k = IDPrivateKey()
+    k.pri = PrivateKey(b58decode(key), encoder = RawEncoder)
+    pub = PublicID()
+    pub.salt = k.salt
+    pub.key = k.pri.public_key.encode()
+    k.pub = pub
+    return k
+
 class IDPrivateKey:
     
-    def __init__(self,
-                 password = None,
-                 minilockid = None,
-                 randomsalt = True,
-                 customsalt = None):
-        if minilockid is None:
-            if randomsalt:
-                self.salt = random(len(defaultsalt))
-            else:
-                self.salt = defaultsalt
+    def __init__(self, password = None, email = None):
+        if email is None:
+            self.salt = defaultsalt
         else:
-            self.salt = PublicID(minilockid).salt
-        if customsalt is not None:
-            salt.salt = customsalt
-        self.generate_key(password)
-    
+            self.salt = email
+        if password is not None:
+            self.generate_key(password)
+
     def generate_key(self, password):
         self.pri = PrivateKey(scrypt(sha512(password,encoder = RawEncoder),
                                      self.salt,
@@ -50,6 +51,9 @@ class IDPrivateKey:
     def to_public_key(self):
         return self.pub
 
+    def pri_base58(self):
+        return b58encode(self.pri.encode(encoder = RawEncoder))
+
     def pub_base58(self):
         return self.pub.base58()
 
@@ -59,21 +63,12 @@ class IDPrivateKey:
 class PublicID:
     
     def __init__(self, idstr = None):
-        self.salt = None
         self.key = None
         if idstr is not None:
-            idstr = b58decode(idstr)
-            if len(idstr) == 32:
-                self.salt = defaultsalt
-                self.key = idstr
-            else:
-                self.salt = idstr[-16:]
-                self.key = idstr[:-16]
+            self.key = b58decode(idstr)
     
     def base58(self):
-        if self.salt == defaultsalt:
-            return b58encode(self.key)
-        return b58encode(self.key + self.salt)
+        return b58encode(self.key)
 
     def __str__(self):
         return self.base58()
