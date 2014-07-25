@@ -28,11 +28,12 @@ def main():
                       type='str',
                       help='Specify destination minilockids. Can be '
                            'used more than once.')
-    parser.add_option('-s', '--no-salt',
+    parser.add_option('-s', '--short',
                       dest='salt',
                       action='store_false',
                       default=True,
-                      help='Generate miniLockid from password only.')
+                      help='Generate miniLockid from password only. '
+                           '(Insecure!)')
     parser.add_option('-e', '--encrypt',
                       dest='encrypt',
                       action='store',
@@ -52,6 +53,9 @@ def main():
         b58 = IDPrivateKey(password, randomsalt=options.salt).\
               pub_base58()
         print("miniLockid: {}".format(b58))
+    elif options.mlid is None and options.salt:
+        print('You must set the short miniLock ID option or '
+              'specify your full ID.')
     elif options.encrypt:
         password = getpass('Passphrase: ')
         pk = IDPrivateKey(password, options.mlid, randomsalt=False)
