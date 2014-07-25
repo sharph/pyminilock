@@ -9,14 +9,22 @@ from struct import pack, unpack
 from nacl.public import PrivateKey, PublicKey
 from nacl.hash import sha512
 from nacl.encoding import RawEncoder
+from nacl.utils import random
 
 defaultsalt = 'miniLockScrypt..'
 
 class IDPrivateKey:
     
-    def __init__(self, password = None, minilockid = None, customsalt = None):
+    def __init__(self,
+                 password = None,
+                 minilockid = None,
+                 randomsalt = True,
+                 customsalt = None):
         if minilockid is None:
-            self.salt = defaultsalt
+            if randomsalt:
+                self.salt = random(len(defaultsalt))
+            else:
+                self.salt = defaultsalt
         else:
             self.salt = PublicID(minilockid).salt
         if customsalt is not None:

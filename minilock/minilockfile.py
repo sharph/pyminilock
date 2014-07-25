@@ -16,6 +16,8 @@ from . import minilockid
 class DecryptionError(Exception):
     pass
 
+class FileTypeError(Exception):
+    pass
 
 def _dec_from_dict(box, d):
     nonce, ctext = d['nonce'], d['data']
@@ -25,7 +27,7 @@ def _dec_from_dict(box, d):
 
 def decrypt_file(data, idprivatekey):
     if data[:16] != 'miniLockFileYes.':
-        raise DecryptionError
+        raise FileTypeError
     metadata, data = data[16:].split('miniLockEndInfo.',1)
     metadata = json.loads(metadata)
     ephkey = PublicKey(metadata['ephemeral'], encoder=Base64Encoder)
@@ -40,10 +42,14 @@ def decrypt_file(data, idprivatekey):
         except CryptoError:
             pass
     
-    filenonce = b64decode(fileinfo['fileNonce'])
+    try:
+        filenonce = b64decode(fileinfo['fileNonce'])
+    except UnboundLocalError:
+        raise DecryptionError
     
-    sender = PublicKey(b58decode(fileinfo['senderID']), encoder=RawEncoder)
-    box = Box(idprivatekey.to_private_key(), sender)
+    sender = minilockid.PublicID(fileinfo['senderID'])
+    senderkey = sender.to_public_key()
+    box = Box(idprivatekey.to_private_key(), senderkey)
 
     filename = _dec_from_dict(box, fileinfo['fileName'])
     filename = filename.rstrip('\00')
@@ -51,7 +57,7 @@ def decrypt_file(data, idprivatekey):
     filekey = _dec_from_dict(box, fileinfo['fileKey'])
     
     box = SecretBox(filekey, encoder=RawEncoder)
-    return filename, box.decrypt(data, filenonce, encoder=RawEncoder)
+    return sender, filename, box.decrypt(data, filenonce, encoder=RawEncoder)
 
 
 def _enc_into_dict(box, data):
